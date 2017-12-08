@@ -1,0 +1,24 @@
+{
+  "name": "brain-diminished/evaluable-compiler",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Dorian Savina",
+      "email": "dorian.savina@gmail.com"
+    }
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "require": {
+    "brain-diminished/evaluable-light": "^1.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^6.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "BrainDiminished\\Evaluable\\Compiler\\": "src/"
+    }
+  }
+}
