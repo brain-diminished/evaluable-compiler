@@ -14,6 +14,9 @@
         "php": "^7.1",
         "brain-diminished/evaluable-light": "^1.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^6.5"
+    },
     "autoload": {
         "psr-4": {
             "BrainDiminished\\Compiler\\": "src/"
