@@ -1,9 +1,9 @@
 <?php
-namespace BrainDiminished\Evaluable\Compiler\Token;
+namespace BrainDiminished\Compiler\Atom;
 
-abstract class Token
+abstract class Atom
 {
-    const ATOM              = 1 << 0;
+    const KEYWORD           = 1 << 0;
     const PREFIX_OPERATOR   = 1 << 1;
     const INFIX_OPERATOR    = 1 << 2;
     const DELIMITER         = 1 << 3;

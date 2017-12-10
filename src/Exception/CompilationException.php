@@ -1,5 +1,5 @@
 <?php
-namespace BrainDiminished\Evaluable\Compiler\Exception;
+namespace BrainDiminished\Compiler\Exception;
 
 class CompilationException extends \Exception
 {

@@ -1,55 +1,39 @@
 <?php
-namespace BrainDiminished\Evaluable\Compiler\Stream;
+namespace BrainDiminished\Compiler\Stream;
 
-use BrainDiminished\Evaluable\Compiler\Exception\CompilationException;
-use BrainDiminished\Evaluable\Compiler\Token\AtomToken;
-use BrainDiminished\Evaluable\Compiler\Token\DelimiterToken;
-use BrainDiminished\Evaluable\Compiler\Token\InfixOperatorToken;
-use BrainDiminished\Evaluable\Compiler\Token\PrefixOperatorToken;
-use BrainDiminished\Evaluable\Compiler\Token\Token;
-use BrainDiminished\Evaluable\Compiler\Context\CompilationContext;
+use BrainDiminished\Compiler\Exception\CompilationException;
+use BrainDiminished\Compiler\Atom\KeywordAtom;
+use BrainDiminished\Compiler\Atom\DelimiterAtom;
+use BrainDiminished\Compiler\Atom\InfixAtom;
+use BrainDiminished\Compiler\Atom\PrefixSymbol;
+use BrainDiminished\Compiler\Atom\Atom;
+use BrainDiminished\Compiler\Environment\CompilationEnvironment;
 
-class CompilationStream
+final class CompilationStream
 {
-    /** @var CompilationContext */
-    protected $context;
+    /** @var CompilationEnvironment */
+    private $context;
 
     /** @var string */
-    protected $expression;
+    private $expression;
 
     /** @var string */
-    protected $patternDelimiter;
+    private $stream;
 
-    /** @var string */
-    protected $atomPattern;
-
-    /** @var string */
-    protected $prefixPattern;
-
-    /** @var string */
-    protected $infixPattern;
-
-    /** @var string */
-    protected $stream;
-
-    /** @var Token */
-    protected $lastToken = null;
+    /** @var Atom */
+    private $lastToken = null;
 
 
-    public function __construct(string $expression, CompilationContext $context, string $safetyChar = '@')
+    public function __construct(string $expression, CompilationEnvironment $context, string $safetyChar = '@')
     {
         $this->context = $context;
 
-        $this->patternDelimiter = $this->context->getSafetyChar();
-        $this->atomPattern = $this->context->getAtomPattern();
-        $this->prefixPattern = $this->context->getPrefixOperatorPattern();
-        $this->infixPattern = $this->context->getInfixOperatorPattern();
-
         $this->expression = $expression;
-        $this->stream = ltrim($expression);
+        $this->stream = $expression;
+        $this->ltrim();
     }
 
-    public function current(): ?Token
+    public function current(): ?Atom
     {
         return $this->lastToken;
     }
@@ -59,7 +43,7 @@ class CompilationStream
         return strlen($this->expression) - strlen($this->stream);
     }
 
-    public function next(int $flags, $delimiters = null): ?Token
+    public function next(int $flags, $delimiters = null): ?Atom
     {
         if ($this->tryNext($flags, $delimiters)) {
             return $this->lastToken;
@@ -74,48 +58,46 @@ class CompilationStream
     public function tryNext(int $flags, $delimiters = null): bool
     {
         $position = $this->position();
-        if ($flags & Token::ATOM
-            && $this->tryRead($this->atomPattern, $symbol)) {
-            $this->lastToken = new AtomToken($symbol, $position);
+        if ($flags & Atom::KEYWORD
+            && $this->tryRead($this->context->getAtomPattern(), $symbol)) {
+            $this->lastToken = new KeywordAtom($symbol, $position);
             return true;
         }
-        if ($flags & Token::PREFIX_OPERATOR
-            && $this->tryRead($this->prefixPattern, $symbol)) {
-            $this->lastToken = new PrefixOperatorToken($symbol, $position, $this->context->getPrefixOperatorDescriptor($symbol));
+        if ($flags & Atom::PREFIX_OPERATOR
+            && $this->tryRead($this->context->getPrefixOperatorPattern(), $symbol)) {
+            $this->lastToken = new PrefixSymbol($symbol, $position, $this->context->getPrefixOperator($symbol));
             return true;
         }
-        if ($flags & Token::INFIX_OPERATOR
-            && $this->tryRead($this->infixPattern, $symbol)) {
-            $this->lastToken = new InfixOperatorToken($symbol, $position, $this->context->getInfixOperatorDescriptor($symbol));
+        if ($flags & Atom::INFIX_OPERATOR
+            && $this->tryRead($this->context->getInfixOperatorPattern(), $symbol)) {
+            $this->lastToken = new InfixAtom($symbol, $position, $this->context->getInfixOperator($symbol));
             return true;
         }
-        if ($flags & Token::DELIMITER
+        if ($flags & Atom::DELIMITER
             && $this->tryRead($this->getDelimiterPattern($delimiters), $symbol)) {
-                $this->lastToken = new DelimiterToken($symbol, $position);
+                $this->lastToken = new DelimiterAtom($symbol, $position);
             return true;
         }
 
         return false;
     }
 
-    protected function tryRead($pattern, string &$symbol = null): bool
+    private function tryRead($pattern, string &$symbol = null): bool
     {
         if (empty($pattern)) {
             return false;
         }
-
-        $regex = "$this->patternDelimiter^($pattern)$this->patternDelimiter";
-        if (preg_match($regex, $this->stream, $matches)) {
+        if (preg_match("(^($pattern))", $this->stream, $matches)) {
             $symbol = $matches[0];
             $this->stream = substr($this->stream, strlen($symbol));
-            $this->stream = ltrim($this->stream);
+            $this->ltrim();
             return true;
         }
 
         return false;
     }
 
-    protected function getDelimiterPattern($delimiters) {
+    private function getDelimiterPattern($delimiters) {
         if (empty($delimiters)) {
             return '$';
         } else  {
@@ -123,12 +105,20 @@ class CompilationStream
         }
     }
 
-    protected function pattern($symbols)
+    private function pattern($symbols)
     {
         if (is_array($symbols)) {
             return implode('|', array_map('preg_quote', array_filter($symbols)));
         } else {
             return preg_quote($symbols);
+        }
+    }
+
+    private function ltrim()
+    {
+        $blank = $this->context->getBlankPattern();
+        if (preg_match("(^($blank))", $this->stream, $matches)) {
+            $this->stream = substr($this->stream, strlen($matches[0]));
         }
     }
 }

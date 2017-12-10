@@ -1,5 +1,5 @@
 {
-    "name": "brain-diminished/evaluable-compiler",
+    "name": "brain-diminished/compiler",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -16,7 +16,7 @@
     },
     "autoload": {
         "psr-4": {
-            "BrainDiminished\\Evaluable\\Compiler\\": "src/"
+            "BrainDiminished\\Compiler\\": "src/"
         }
     }
 }
