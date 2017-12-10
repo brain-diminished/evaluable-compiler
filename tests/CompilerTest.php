@@ -3,7 +3,6 @@ namespace BrainDiminished\Test\Compiler;
 
 use BrainDiminished\Compiler\Compiler;
 use BrainDiminished\Compiler\Environment\CompilationEnvironment;
-use BrainDiminished\Compiler\Atom\KeywordAtom;
 use BrainDiminished\Compiler\Generic\Arity;
 use BrainDiminished\Compiler\Generic\MetaOperator;
 use BrainDiminished\Evaluable\Evaluable;
@@ -30,9 +29,15 @@ class EnvironmentTest implements CompilationEnvironment
 {
     private $prefixOps;
     private $infixOps;
+    private $prefixPattern;
+    private $infixPattern;
 
     public function __construct()
     {
+        $this->constants = [
+
+        ];
+
         $this->prefixOps = [
             '-' => new UnaryOperator('-'),
             '+' => new UnaryOperator('+'),
@@ -48,6 +53,15 @@ class EnvironmentTest implements CompilationEnvironment
             '&&' => new BinaryOperator('&&', 12),
             '²' => new StaticPowOperator(2),
         ];
+
+        $this->prefixPattern = '\d+(\.\d*)?|(\.\d*)?\d+|true\b|false\b|null\b|'.implode('|', array_map('preg_quote', array_keys($this->prefixOps)));
+        $this->infixPattern = implode('|', array_map('preg_quote', array_keys($this->infixOps)));
+    }
+
+    private function opPattern($op)
+    {
+        $quoted = preg_quote($op);
+        return "(?<$op>$quoted)";
     }
 
     public function getBlankPattern(): string { return '[ \n\r\t]+'; }
@@ -62,10 +76,10 @@ class EnvironmentTest implements CompilationEnvironment
             default: throw new \Exception;
         }
     }
-    public function getPrefixOperatorPattern(): string { return implode('|', array_map('preg_quote', array_keys($this->prefixOps))); }
-    public function getPrefixOperator(string $symbol): MetaOperator { return $this->prefixOps[$symbol]; }
+    public function getPrefixOperatorPattern(): string { return $this->prefixPattern; }
+    public function getPrefixOperator(string $symbol, ?string $pregId): MetaOperator { return $this->prefixOps[$symbol]; }
     public function getInfixOperatorPattern(): string { return implode('|', array_map('preg_quote', array_keys($this->infixOps))); }
-    public function getInfixOperator(string $symbol): MetaOperator { return $this->infixOps[$symbol]; }
+    public function getInfixOperator(string $symbol, ?string $pregId): MetaOperator { return $this->infixOps[$symbol]; }
 }
 
 class Constant implements Evaluable
@@ -75,7 +89,7 @@ class Constant implements Evaluable
     public function evaluate(RuntimeContext $context = null) { return $this->value; }
 }
 
-class BinaryOperator extends MetaOperator
+class MetaBinaryOperator extends MetaOperator
 {
     /** @var string */
     private $op;
@@ -100,9 +114,18 @@ class BinaryOperator extends MetaOperator
             default: throw new \Exception;
         }
     }
+
+    /**
+     * @param Evaluable[] $args
+     * @return Evaluable
+     */
+    public function build(array $args = []): Evaluable
+    {
+        // TODO: Implement build() method.
+    }
 }
 
-class UnaryOperator extends MetaOperator
+class MetaUnaryOperator extends MetaOperator
 {
     /** @var string */
     private $op;
@@ -122,9 +145,18 @@ class UnaryOperator extends MetaOperator
             case '~': return ~ $args[0]->evaluate($context);
         }
     }
+
+    /**
+     * @param Evaluable[] $args
+     * @return Evaluable
+     */
+    public function build(array $args = []): Evaluable
+    {
+        // TODO: Implement build() method.
+    }
 }
 
-class StaticPowOperator extends MetaOperator
+class MetaStaticPowOperator extends MetaOperator
 {
     private $pow;
 
@@ -138,4 +170,9 @@ class StaticPowOperator extends MetaOperator
     {
         return $args[0]->evaluate($context) ** $this->pow;
     }
+}
+
+class Operator implements Evaluable
+{
+
 }

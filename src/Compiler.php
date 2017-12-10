@@ -4,10 +4,8 @@ namespace BrainDiminished\Compiler;
 use BrainDiminished\Compiler\Environment\CompilationEnvironment;
 use BrainDiminished\Compiler\Exception\CompilationException;
 use BrainDiminished\Compiler\Stream\CompilationStream;
-use BrainDiminished\Compiler\Atom\KeywordAtom;
 use BrainDiminished\Compiler\Atom\DelimiterAtom;
 use BrainDiminished\Compiler\Atom\OperatorAtom;
-use BrainDiminished\Compiler\Atom\PrefixSymbol;
 use BrainDiminished\Compiler\Atom\Atom;
 use BrainDiminished\Evaluable\Evaluable;
 
@@ -19,7 +17,7 @@ final class Compiler
     /** @var CompilationEnvironment */
     private $compilationContext;
 
-    private const INITIAL_STATE = Atom::KEYWORD | Atom::PREFIX_OPERATOR;
+    private const INITIAL_STATE = Atom::PREFIX_OPERATOR;
     private const PROCESS_STATE = Atom::INFIX_OPERATOR | Atom::DELIMITER;
 
     public function __construct(CompilationEnvironment $context)
@@ -28,12 +26,12 @@ final class Compiler
     }
 
     public function compile(string $expression): Evaluable
-        {
+    {
         $stream = new CompilationStream($expression, $this->compilationContext);
         return $this->compileOne($stream);
     }
 
-    private function compileOne(CompilationStream $stream, $delimiters = null): Evaluable
+    private function compileOne(CompilationStream $stream, $delimiters = null)
     {
         /** @var Evaluable[] $processed */
         $processed = [];
@@ -43,18 +41,11 @@ final class Compiler
 
         $state = self::INITIAL_STATE;
         while (!$stream->next($state, $delimiters) instanceof DelimiterAtom) {
-            switch ($state) {
-                case self::INITIAL_STATE:
-                    $state = $this->initialize($stream, $processed, $stack);
-                    break;
-                case self::PROCESS_STATE:
-                    $state = $this->process($stream, $processed, $stack);
-                    break;
-            }
+            $state = $this->processAtom($stream, $processed, $stack);
         }
 
         while(!empty($stack)) {
-            $this->interpret(array_pop($stack), $processed);
+            $this->queueAtom(array_pop($stack), $processed);
         }
 
         if (count($processed) > 1) {
@@ -63,49 +54,35 @@ final class Compiler
         return $processed[0];
     }
 
-    private function initialize(CompilationStream $stream, array &$processed, array &$stack): int
+    private function processAtom(CompilationStream $stream, array &$processed, array &$stack): int
     {
-        $token = $stream->current();
-        switch (true) {
-            case $token instanceof KeywordAtom:
-                $this->interpret($token, $processed);
-                return self::PROCESS_STATE;
-            case $token instanceof PrefixSymbol:
-                return $this->process($stream, $processed, $stack);
-            default:
-                throw new CompilationException("State error near $token->symbol", $token->position);
-        }
-    }
+        /** @var OperatorAtom $atom */
+        $atom = $stream->current();
+        $arity = $atom->meta()->arity();
 
-    private function process(CompilationStream $stream, array &$processed, array &$stack): int
-    {
-        /** @var OperatorAtom $token */
-        $token = $stream->current();
-        $arity = $token->meta->arity();
+        $this->stack($atom, $processed, $stack);
 
-        $this->stack($token, $processed, $stack);
-
-        $largc = $token->largc();
-        if ($largc === 0) {
+        $rargc = $atom->rargc();
+        if ($rargc === 0) {
             $args = [];
-        } else if (!empty($arity->delimiter())) {
-            if ($largc === 1) {
-                $args = [$this->compileOne($stream, $arity->delimiter())];
+        } else if (!empty($atom->meta()->delimiter())) {
+            if ($rargc === 1) {
+                $args = [$this->compileOne($stream, $atom->meta()->delimiter())];
             } else {
-                $args = $this->compileMany($stream, $arity->separator(), $arity->delimiter(), $largc);
+                $args = $this->compileMany($stream, $atom->meta()->separator(), $atom->meta()->delimiter(), $rargc);
             }
-        } else /* $largc !== null */ {
-            for ($i = 1; $i < $largc; $i++) {
-                $processed[] = $this->compileOne($stream, $arity->separator());
+        } else /* empty($arity->delimiter()) => $rargc !== null */ {
+            for ($i = 1; $i < $rargc; $i++) {
+                $processed[] = $this->compileOne($stream, $atom->meta()->separator());
             }
             return self::INITIAL_STATE;
         }
 
         array_pop($stack);
-        for ($i = $largc; $i < $arity->argc(); $i++) {
+        for ($i = 0; $i < $atom->largc(); $i++) {
             array_unshift($args, $this->popOne($processed));
         }
-        $processed[] = $token->meta->build($args);
+        $processed[] = $atom->meta()->build($args);
         return self::PROCESS_STATE;
     }
 
@@ -127,14 +104,14 @@ final class Compiler
         return $args;
     }
 
-    private function stack(OperatorAtom $token, array &$processed, array &$stack)
+    private function stack(OperatorAtom $atom, array &$processed, array &$stack)
     {
         while (!empty($stack)
-            && !$this->precede($token, end($stack))) {
-            $this->interpret(array_pop($stack), $processed);
+            && !$this->precede($atom, end($stack))) {
+            $this->queueAtom(array_pop($stack), $processed);
         }
 
-        $stack[] = $token;
+        $stack[] = $atom;
     }
 
     private function popOne(array &$processed): Evaluable
@@ -159,27 +136,17 @@ final class Compiler
 
     private function precede(OperatorAtom $o1, OperatorAtom $o2): bool
     {
-        $a1 = $o1->meta->arity();
-        if ($a1->isPrefix()) {
+        if ($o1->largc() === 0) {
             return true;
         }
-        $a2 = $o2->meta->arity();
-        if ($a2->argc() === 1 || !empty($a2->delimiter())) {
+        if ($o2->rargc() === 0 || !empty($o2->meta()->arity()->delimiter())) {
             return false;
         }
-        return $a1->leftPriority() < $a2->rightPriority();
+        return $o1->meta()->arity()->leftPriority() < $o2->meta()->arity()->rightPriority();
     }
 
-    private function interpret(Atom $token, array &$processed)
+    private function queueAtom(OperatorAtom $atom, array &$processed)
     {
-        switch (true) {
-            case $token instanceof KeywordAtom:
-                $processed[] = $this->compilationContext->buildAtom($token);
-                break;
-            case $token instanceof OperatorAtom:
-                $args = $this->popMany($processed, $token->meta->arity()->argc());
-                $processed[] = $token->meta->build($args);
-                break;
-        }
+        $processed[] = $atom->meta()->build($this->popMany($processed, $atom->argc()));
     }
 }

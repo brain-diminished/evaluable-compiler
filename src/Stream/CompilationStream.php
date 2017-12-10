@@ -2,10 +2,9 @@
 namespace BrainDiminished\Compiler\Stream;
 
 use BrainDiminished\Compiler\Exception\CompilationException;
-use BrainDiminished\Compiler\Atom\KeywordAtom;
 use BrainDiminished\Compiler\Atom\DelimiterAtom;
 use BrainDiminished\Compiler\Atom\InfixAtom;
-use BrainDiminished\Compiler\Atom\PrefixSymbol;
+use BrainDiminished\Compiler\Atom\PrefixAtom;
 use BrainDiminished\Compiler\Atom\Atom;
 use BrainDiminished\Compiler\Environment\CompilationEnvironment;
 
@@ -24,7 +23,7 @@ final class CompilationStream
     private $lastToken = null;
 
 
-    public function __construct(string $expression, CompilationEnvironment $context, string $safetyChar = '@')
+    public function __construct(string $expression, CompilationEnvironment $context)
     {
         $this->context = $context;
 
@@ -58,19 +57,14 @@ final class CompilationStream
     public function tryNext(int $flags, $delimiters = null): bool
     {
         $position = $this->position();
-        if ($flags & Atom::KEYWORD
-            && $this->tryRead($this->context->getAtomPattern(), $symbol)) {
-            $this->lastToken = new KeywordAtom($symbol, $position);
-            return true;
-        }
         if ($flags & Atom::PREFIX_OPERATOR
-            && $this->tryRead($this->context->getPrefixOperatorPattern(), $symbol)) {
-            $this->lastToken = new PrefixSymbol($symbol, $position, $this->context->getPrefixOperator($symbol));
+            && $this->tryRead($this->context->getPrefixOperatorPattern(), $symbol, $pregId)) {
+            $this->lastToken = new PrefixAtom($symbol, $position, $this->context->getPrefixOperator($symbol, $pregId));
             return true;
         }
         if ($flags & Atom::INFIX_OPERATOR
-            && $this->tryRead($this->context->getInfixOperatorPattern(), $symbol)) {
-            $this->lastToken = new InfixAtom($symbol, $position, $this->context->getInfixOperator($symbol));
+            && $this->tryRead($this->context->getInfixOperatorPattern(), $symbol, $pregId)) {
+            $this->lastToken = new InfixAtom($symbol, $position, $this->context->getInfixOperator($symbol, $pregId));
             return true;
         }
         if ($flags & Atom::DELIMITER
@@ -82,13 +76,21 @@ final class CompilationStream
         return false;
     }
 
-    private function tryRead($pattern, string &$symbol = null): bool
+    private function tryRead($pattern, string &$symbol = null, &$pregId = null): bool
     {
         if (empty($pattern)) {
             return false;
         }
         if (preg_match("(^($pattern))", $this->stream, $matches)) {
             $symbol = $matches[0];
+            $len = strlen($symbol);
+            foreach ($matches as $key => $value) {
+                if (strlen($value) !== $len || is_int($key)) {
+                    continue;
+                }
+                $pregId = $key;
+                break;
+            }
             $this->stream = substr($this->stream, strlen($symbol));
             $this->ltrim();
             return true;

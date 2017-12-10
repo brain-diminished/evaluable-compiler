@@ -1,7 +1,6 @@
 <?php
 namespace BrainDiminished\Compiler\Environment;
 
-use BrainDiminished\Compiler\Atom\KeywordAtom;
 use BrainDiminished\Compiler\Generic\MetaOperator;
 use BrainDiminished\Evaluable\Evaluable;
 
@@ -23,19 +22,6 @@ interface CompilationEnvironment
     public function getBlankPattern(): string;
 
     /**
-     * A pattern to match an atomic symbol.
-     * @return string
-     */
-    public function getAtomPattern(): string;
-
-    /**
-     * Construct an Evaluable from an atomic symbol.
-     * @param KeywordAtom $symbol
-     * @return Evaluable
-     */
-    public function buildAtom(KeywordAtom $symbol): Evaluable;
-
-    /**
      * A pattern to match a prefix operator.
      * @return string
      */
@@ -46,7 +32,7 @@ interface CompilationEnvironment
      * @param string $symbol
      * @return MetaOperator
      */
-    public function getPrefixOperator(string $symbol): MetaOperator;
+    public function getPrefixOperator(string $symbol, ?string $pregId): MetaOperator;
 
     /**
      * A pattern to match an infix operator (ie with one argument on the left side).
@@ -59,5 +45,5 @@ interface CompilationEnvironment
      * @param string $symbol
      * @return MetaOperator
      */
-    public function getInfixOperator(string $symbol): MetaOperator;
+    public function getInfixOperator(string $symbol, ?string $pregId): MetaOperator;
 }

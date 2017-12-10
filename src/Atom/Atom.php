@@ -3,10 +3,9 @@ namespace BrainDiminished\Compiler\Atom;
 
 abstract class Atom
 {
-    const KEYWORD           = 1 << 0;
-    const PREFIX_OPERATOR   = 1 << 1;
-    const INFIX_OPERATOR    = 1 << 2;
-    const DELIMITER         = 1 << 3;
+    const PREFIX_OPERATOR   = 1 << 0;
+    const INFIX_OPERATOR    = 1 << 1;
+    const DELIMITER         = 1 << 2;
 
     /** @var string */
     public $symbol;

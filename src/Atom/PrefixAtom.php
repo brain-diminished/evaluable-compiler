@@ -1,10 +1,10 @@
 <?php
 namespace BrainDiminished\Compiler\Atom;
 
-final class InfixAtom extends OperatorAtom
+final class PrefixAtom extends OperatorAtom
 {
     public function largc(): int
     {
-        return 1;
+        return 0;
     }
 }
